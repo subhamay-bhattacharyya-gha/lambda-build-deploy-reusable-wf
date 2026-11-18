@@ -24,7 +24,7 @@ The main artifact is the workflow. Any change to its inputs, outputs, or steps i
 - `function_base_name` is the base name. The source folder is `<functions_root>/<function_base_name>/`. The deployed Lambda name is `<function_base_name>-<environment>-<aws_region>`, built inside the workflow. Keep the folder check on the base name only.
 - Keep the S3 key format `<deployed name>/<deployed name>-<GITHUB_SHA>.zip`, where the deployed name is `<function_base_name>-<environment>-<aws_region>`, unless the user asks to change it.
 - The deploy step uses the zip built in that run, not the S3 object. Keep the two in sync if either changes.
-- Pin third-party actions to versions already used in this repo (`actions/checkout@v7.0.1`, `actions/setup-python@v5`, `aws-actions/configure-aws-credentials@v4`). Runner: `ubuntu-26.04`.
+- Pin third-party actions to versions already used in this repo (`actions/checkout@v7.0.1`, `actions/setup-python@v7`, `aws-actions/configure-aws-credentials@v6`. Both run on Node 24, so avoid Node 20 actions). Runner: `ubuntu-26.04`.
 
 ## Validating changes
 
