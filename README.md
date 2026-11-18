@@ -84,47 +84,51 @@ Before the workflow can run successfully:
 
 ## Example usage
 
+This caller uses dummy values and runs only from `workflow_dispatch`. Replace the bucket, account, and role values before running it.
+
 ```yaml
-name: Deploy Lambda
+name: Deploy Lambda (caller example)
+
+run-name: Deploy Lambda ${{ inputs.function_name || 'test-lambda' }} by ${{ github.actor }}
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'lambda/test-lambda/**'
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: Lambda function to deploy (must match a folder under lambda/)
+        type: string
+        required: false
+        default: test-lambda
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  deploy-test-lambda:
+  deploy:
+    name: Build and deploy test-lambda
     uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
     with:
-      function_name: test-lambda
-      s3_bucket_name: my-lambda-packages
+      function_name: ${{ inputs.function_name || 'test-lambda' }}
+      s3_bucket_name: dummy-lambda-packages-bucket
       aws_region: us-east-1
-      aws_account_id: "123456789012"
-      aws_oidc_role_name: github-oidc-lambda
+      aws_account_id: "000000000000"
+      aws_oidc_role_name: dummy-github-oidc-lambda-role
       python_version: "3.12"
-```
+      functions_root: lambda
+      environment: ci
+      runner: ubuntu-26.04
 
-To use the S3 URI in a later job:
-
-```yaml
-  deploy-test-lambda:
-    uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
-    with:
-      # ...inputs as above
-  
-  after-deploy:
-    needs: deploy-test-lambda
+  summary:
+    name: Show deployed package
+    needs: deploy
     runs-on: ubuntu-26.04
     steps:
-      - run: echo "Deployed ${{ needs.deploy-test-lambda.outputs.s3_uri }}"
+      - name: Print S3 URI
+        run: 'echo "Deployed package: ${{ needs.deploy.outputs.s3_uri }}"'
 ```
 
-> The `s3_uri` output is set on the called workflow's `package` job. Reference it through the caller's job name, as shown above.
+The `s3_uri` output comes from the called workflow's `package` job. The caller reads it as `needs.<caller job>.outputs.s3_uri`, as the `summary` job does.
 
 Pin `@main` to a release tag (for example `@v1.0.0`) in production callers.
 
