@@ -1,53 +1,165 @@
-# GitHub Action Template Repository
+# lambda-build-deploy-reusable-wf
 
-![Built with Copilot](https://img.shields.io/badge/Built_with-Copilot-brightgreen?logo=github)&nbsp;![Release](https://github.com/subhamay-bhattacharyya-gha/github-action-template/actions/workflows/release.yaml/badge.svg)&nbsp;![Commit Activity](https://img.shields.io/github/commit-activity/t/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Last Commit](https://img.shields.io/github/last-commit/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Release Date](https://img.shields.io/github/release-date/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Repo Size](https://img.shields.io/github/repo-size/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![File Count](https://img.shields.io/github/directory-file-count/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Issues](https://img.shields.io/github/issues/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Top Language](https://img.shields.io/github/languages/top/subhamay-bhattacharyya-gha/github-action-template)&nbsp;![Custom Endpoint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/06e35985280456b113298ed56c626e73/raw/github-action-template.json?)
+![Built with Copilot](https://img.shields.io/badge/Built_with-Copilot-brightgreen?logo=github)&nbsp;![Release](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/actions/workflows/release.yaml/badge.svg)&nbsp;![Commit Activity](https://img.shields.io/github/commit-activity/t/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Last Commit](https://img.shields.io/github/last-commit/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Release Date](https://img.shields.io/github/release-date/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Repo Size](https://img.shields.io/github/repo-size/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![File Count](https://img.shields.io/github/directory-file-count/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Issues](https://img.shields.io/github/issues/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Top Language](https://img.shields.io/github/languages/top/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Custom Endpoint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/ea51658500e2653e96ecab6e4e9ea6d4/raw/lambda-build-deploy-reusable-wf.json?)
 
-A Template GitHub Repository to be used to create a composite action.
-
-## Action Name
-
-### Action Description
-
-This GitHub Action provides a reusable composite workflow that sets up Python and interacts with the GitHub API to post a comment on an issue, including a link to a created branch.
+A reusable GitHub Actions workflow that packages an AWS Lambda function from a folder in the calling repository, uploads the package to S3, and updates the function code. All environment-specific values are passed in as inputs, so the same workflow works across accounts, regions, and runtimes.
 
 ---
 
-## Inputs
+## Contents
 
-| Name           | Description         | Required | Default        |
-|----------------|---------------------|----------|----------------|
-| `input-1`      | Input description.  | No       | `default-value`|
-| `input-2`      | Input description.  | No       | `default-value`|
-| `input-3`      | Input description.  | No       | `default-value`|
-| `github-token` | GitHub token. Used for API authentication. | Yes | — |
+- [What it does](#what-it-does)
+- [Workflow: `build-deploy-lambda.yaml`](#workflow-build-deploy-lambdayaml)
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+- [Prerequisites](#prerequisites)
+- [Example usage](#example-usage)
+- [Repository layout](#repository-layout)
+- [Releasing](#releasing)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Example Usage
+## What it does
+
+For the function named by `function_name`, the workflow:
+
+1. Checks out the calling repository.
+2. Validates the inputs and confirms `<functions_root>/<function_name>/` exists.
+3. Sets up Python at `python_version`.
+4. Authenticates to AWS with GitHub OIDC by assuming `arn:aws:iam::<aws_account_id>:role/<aws_oidc_role_name>`.
+5. Installs `requirements.txt` (if present) into a build directory.
+6. Copies the function source over the dependencies, removes `requirements.txt` and `__pycache__`, and zips the result.
+7. Uploads the zip to `s3://<s3_bucket_name>/<function_name>/<function_name>-<commit SHA>.zip`.
+8. Runs `aws lambda update-function-code` with the same zip and waits until the function is updated.
+
+Each run writes the S3 URI and function name to the job summary.
+
+---
+
+## Workflow: `build-deploy-lambda.yaml`
+
+The workflow is triggered by `workflow_call`. It is not run directly; a caller workflow invokes it with `uses:`.
+
+File: [.github/workflows/build-deploy-lambda.yaml](.github/workflows/build-deploy-lambda.yaml)
+
+### Inputs
+
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `function_name` | Yes | — | Lambda function to package. Must match a folder under `functions_root`, and must also be the deployed function's name. |
+| `s3_bucket_name` | Yes | — | S3 bucket that stores the deployment packages. |
+| `aws_region` | Yes | — | AWS region for OIDC authentication, S3, and Lambda. |
+| `aws_account_id` | Yes | — | AWS account ID that contains the OIDC role. |
+| `aws_oidc_role_name` | Yes | — | Name of the IAM role assumed through GitHub OIDC. Pass the name only, not the ARN. |
+| `python_version` | No | `3.12` | Python version used to install requirements and build the package. |
+| `functions_root` | No | `lambda` | Folder in the calling repository that holds one sub-folder per function. |
+| `environment` | No | `ci` | GitHub environment the job runs in. Controls which environment secrets and protection rules apply. |
+| `runner` | No | `ubuntu-26.04` | Runner label for the job. |
+
+### Outputs
+
+| Name | Description |
+| --- | --- |
+| `s3_uri` | S3 URI of the uploaded Lambda package. |
+
+### Permissions
+
+The workflow requests `contents: read` and `id-token: write`. A reusable workflow can only receive permissions that the caller grants, so the caller must include both.
+
+---
+
+## Prerequisites
+
+Before the workflow can run successfully:
+
+- **Function folder:** each function lives at `<functions_root>/<function_name>/` in the calling repository. Put dependencies in `requirements.txt` in that folder.
+- **Lambda function:** a function with the name `function_name` must already exist in the target account and region. The workflow updates its code and does not create it.
+- **S3 bucket:** the bucket must exist and the OIDC role must allow `s3:PutObject` on it.
+- **OIDC trust:** the IAM role must trust GitHub's OIDC provider for the calling repository.
+- **IAM permissions:** the role needs `lambda:UpdateFunctionCode` and `lambda:GetFunction` (used by the wait step) on the function.
+
+---
+
+## Example usage
 
 ```yaml
-name: Example Workflow
+name: Deploy Lambda
 
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths:
+      - 'lambda/test-lambda/**'
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  example:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Custom Action
-        uses: your-org/your-action-repo@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          input-1: your-value
-          input-2: another-value
-          input-3: something-else
+  deploy-test-lambda:
+    uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
+    with:
+      function_name: test-lambda
+      s3_bucket_name: my-lambda-packages
+      aws_region: us-east-1
+      aws_account_id: "123456789012"
+      aws_oidc_role_name: github-oidc-lambda
+      python_version: "3.12"
 ```
+
+To use the S3 URI in a later job:
+
+```yaml
+  deploy-test-lambda:
+    uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
+    with:
+      # ...inputs as above
+  
+  after-deploy:
+    needs: deploy-test-lambda
+    runs-on: ubuntu-26.04
+    steps:
+      - run: echo "Deployed ${{ needs.deploy-test-lambda.outputs.s3_uri }}"
+```
+
+> The `s3_uri` output is set on the called workflow's `package` job. Reference it through the caller's job name, as shown above.
+
+Pin `@main` to a release tag (for example `@v1.0.0`) in production callers.
+
+---
+
+## Repository layout
+
+```text
+.github/
+  workflows/
+    build-deploy-lambda.yaml   # The reusable workflow
+    release.yaml               # semantic-release on push to main
+    create-branch.yaml         # Creates a feature branch when an issue is assigned
+    notify.yaml                # Slack notification on new issues and PRs
+    claude.yaml                # Claude Code on @claude mentions
+scripts/plugins/               # Custom semantic-release plugins
+CHANGELOG.md                   # Generated by semantic-release
+```
+
+---
+
+## Releasing
+
+Releases are automated with [semantic-release](https://github.com/semantic-release/semantic-release). A push to `main` runs the `Release` workflow, which reads [Conventional Commit](https://www.conventionalcommits.org/) messages to decide the next version, updates `CHANGELOG.md`, tags the release, and publishes it on GitHub.
+
+Use `feat:` for a new feature, `fix:` for a bug fix, and `feat!:` or a `BREAKING CHANGE:` footer for a breaking change.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

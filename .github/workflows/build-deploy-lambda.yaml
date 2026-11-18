@@ -1,0 +1,149 @@
+name: Build and Upload Lambda Package
+
+run-name: Lambda package build for ${{ inputs.function_name }} by ${{ github.actor }}
+
+# Reusable workflow: builds a Lambda deployment package from lambda/<function_name>/
+# and uploads it to S3. All environment-specific values are passed in by the caller.
+on:
+  workflow_call:
+    inputs:
+      function_name:
+        description: Lambda function to package (must match a folder under functions_root)
+        type: string
+        required: true
+      s3_bucket_name:
+        description: S3 bucket that stores the Lambda deployment packages
+        type: string
+        required: true
+      aws_region:
+        description: AWS region used for OIDC authentication and S3
+        type: string
+        required: true
+      aws_account_id:
+        description: AWS account ID that holds the OIDC role
+        type: string
+        required: true
+      aws_oidc_role_name:
+        description: Name of the IAM role assumed via GitHub OIDC (no ARN)
+        type: string
+        required: true
+      python_version:
+        description: Python version used to install requirements and build the package
+        type: string
+        required: false
+        default: "3.12"
+      functions_root:
+        description: Repository folder that contains one sub-folder per Lambda function
+        type: string
+        required: false
+        default: lambda
+      environment:
+        description: GitHub environment to run the job in (controls which secrets and protection rules apply)
+        type: string
+        required: false
+        default: ci
+      runner:
+        description: Runner label for the build job
+        type: string
+        required: false
+        default: ubuntu-26.04
+    outputs:
+      s3_uri:
+        description: S3 URI of the uploaded Lambda package
+        value: ${{ jobs.package.outputs.s3_uri }}
+
+# Permissions requested here must be granted by the calling workflow.
+# id-token: write is required for OIDC authentication to AWS.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  package:
+    name: Build and Upload Lambda Package
+    runs-on: ${{ inputs.runner }}
+    environment: ${{ inputs.environment }}
+    outputs:
+      s3_uri: ${{ steps.upload.outputs.s3_uri }}
+    env:
+      FUNCTION_NAME: ${{ inputs.function_name }}
+      FUNCTION_DIR: ${{ inputs.functions_root }}/${{ inputs.function_name }}
+      LAMBDA_PACKAGE_S3_BUCKET_NAME: ${{ inputs.s3_bucket_name }}
+      LAMBDA_PYTHON_VERSION: ${{ inputs.python_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          if [ -z "${FUNCTION_NAME}" ]; then
+            echo "::error::function_name input is empty"
+            exit 1
+          fi
+          if [ -z "${LAMBDA_PACKAGE_S3_BUCKET_NAME}" ]; then
+            echo "::error::s3_bucket_name input is empty"
+            exit 1
+          fi
+          if [ -z "${LAMBDA_PYTHON_VERSION}" ]; then
+            echo "::error::python_version input is empty"
+            exit 1
+          fi
+          if [ ! -d "${FUNCTION_DIR}" ]; then
+            echo "::error::Function folder ${FUNCTION_DIR} does not exist"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.LAMBDA_PYTHON_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.aws_oidc_role_name }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Create virtual environment and install requirements
+        run: |
+          set -euo pipefail
+          if [ -f "${FUNCTION_DIR}/requirements.txt" ]; then
+            python -m venv "${RUNNER_TEMP}/venv"
+            source "${RUNNER_TEMP}/venv/bin/activate"
+            python -m pip install --upgrade pip
+            pip install -r "${FUNCTION_DIR}/requirements.txt" --target "${RUNNER_TEMP}/package"
+          else
+            echo "No requirements.txt found in ${FUNCTION_DIR}; skipping pip install"
+            mkdir -p "${RUNNER_TEMP}/package"
+          fi
+
+      - name: Build Lambda package
+        run: |
+          set -euo pipefail
+          cp -R "${FUNCTION_DIR}/." "${RUNNER_TEMP}/package/"
+          rm -f "${RUNNER_TEMP}/package/requirements.txt"
+          cd "${RUNNER_TEMP}/package"
+          zip -r "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" . -x "*/__pycache__/*"
+          unzip -l "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" | tail -1
+
+      - name: Upload package to S3
+        id: upload
+        run: |
+          set -euo pipefail
+          KEY="${FUNCTION_NAME}/${FUNCTION_NAME}-${GITHUB_SHA}.zip"
+          S3_URI="s3://${LAMBDA_PACKAGE_S3_BUCKET_NAME}/${KEY}"
+          aws s3 cp "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" "${S3_URI}"
+          echo "s3_uri=${S3_URI}" >> "$GITHUB_OUTPUT"
+          echo "### Lambda package uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "${S3_URI}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy Lambda function code
+        run: |
+          set -euo pipefail
+          aws lambda update-function-code \
+            --function-name "${FUNCTION_NAME}" \
+            --zip-file "fileb://${RUNNER_TEMP}/${FUNCTION_NAME}.zip"
+          aws lambda wait function-updated --function-name "${FUNCTION_NAME}"
+          echo "### Lambda function updated" >> "$GITHUB_STEP_SUMMARY"
+          echo "${FUNCTION_NAME}" >> "$GITHUB_STEP_SUMMARY"

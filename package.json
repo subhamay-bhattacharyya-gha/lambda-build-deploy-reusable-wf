@@ -1,7 +1,7 @@
 {
-  "name": "github-action-template",
+  "name": "lambda-build-deploy-reusable-wf",
   "version": "0.0.0",
-  "description": "A sample project using semantic release with custom plugins.",
+  "description": "Reusable GitHub Actions workflow for building and deploying AWS Lambda functions, with semantic-release versioning and custom release plugins.",
   "main": "index.js",
   "scripts": {
     "release": "semantic-release"
@@ -26,13 +26,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/subhamay-bhattacharyya-gha/github-action-template.git"
+    "url": "git+https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf.git"
   },
   "author": "Subhamay Bhattacharyya",
   "license": "MIT",
   "keywords": [],
   "bugs": {
-    "url": "https://github.com/subhamay-bhattacharyya-gha/github-action-template/issues"
+    "url": "https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/issues"
   },
-  "homepage": "https://github.com/subhamay-bhattacharyya-gha/github-action-template#readme"
+  "homepage": "https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf#readme"
 }
