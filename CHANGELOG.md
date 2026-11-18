@@ -1,3 +1,17 @@
+# 1.0.0 (2026-11-18)
+
+
+### Features
+
+* add input variable logging and job summary for Lambda deployment workflow ([70423c6](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/70423c61c2a9fefc489a7b84eeed5809181b3e63))
+* add reusable workflow for building and deploying AWS Lambda functions ([0218384](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/0218384523482079a5e0aafa7ebbf42c17680cdd))
+* enhance Lambda deployment workflow with environment variable handling and job summary updates ([313fa8b](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/313fa8b37fddd3226ae1ed5cb0b704a786a176ac))
+* update example usage in README for deploying Lambda with workflow_dispatch ([5441973](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/5441973b095d3a3da5f29acf2a371633a134e6b9))
+* update example usage in README to reflect variable configuration for AWS Lambda deployment ([a88dbc3](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/a88dbc34c174e6bffb2ec1f418eff098e471b5ae))
+* update function name input to use base name for Lambda deployment ([1bfcff4](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/1bfcff443ddc3bda2bb6eb88451a83c8d840bcc5))
+* update third-party action versions in workflow and documentation ([7819ddc](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/7819ddc6bfebb943fa99c68f0286bdd898c3338e))
+* update workflow and documentation to use function_base_name for Lambda deployment ([0ee900c](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commit/0ee900c7837344b9a48a0889a8d1667c120fed50))
+
 ## [1.1.2](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/compare/v1.1.1...v1.1.2) (2025-05-21)
 
 
