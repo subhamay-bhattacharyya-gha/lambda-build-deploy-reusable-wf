@@ -24,6 +24,10 @@ The main artifact is the workflow. Any change to its inputs, outputs, or steps i
 - `function_base_name` is the base name. The source folder is `<functions_root>/<function_base_name>/`. The deployed Lambda name is `<function_base_name>-<environment>-<aws_region>`, built inside the workflow. Keep the folder check on the base name only.
 - Keep the S3 key format `<deployed name>/<deployed name>-<GITHUB_SHA>.zip`, where the deployed name is `<function_base_name>-<environment>-<aws_region>`, unless the user asks to change it.
 - The deploy step uses the zip built in that run, not the S3 object. Keep the two in sync if either changes.
+- The deployed name is built inside the workflow from `function_base_name`, `environment`, and `aws_region`. Callers pass only the base name. Do not reintroduce a separate deployed-name input without asking.
+- The caller pattern in the README reads `vars.*` in a `config` job and passes the values through job outputs. The environment comes from a `workflow_dispatch` choice. Keep the `vars.*` reads in the caller, not in the reusable workflow.
+- When you add or rename an input, update all of these together: the `on.workflow_call` inputs, the "Print input variables" step, the README inputs table and caller example, and this file.
+- The job summary is written once, in the final "Write job summary" step with `if: always()`. Add new summary rows there, not in the upload or deploy steps.
 - Pin third-party actions to versions already used in this repo (`actions/checkout@v7.0.1`, `actions/setup-python@v7`, `aws-actions/configure-aws-credentials@v6`. Both run on Node 24, so avoid Node 20 actions). Runner: `ubuntu-26.04`.
 
 ## Validating changes
