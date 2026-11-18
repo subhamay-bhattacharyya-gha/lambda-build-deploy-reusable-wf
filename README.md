@@ -23,16 +23,18 @@ A reusable GitHub Actions workflow that packages an AWS Lambda function from a f
 
 ## What it does
 
-For the function named by `function_name`, the workflow:
+For the function named by `function_base_name`, the workflow:
 
 1. Checks out the calling repository.
-2. Validates the inputs and confirms `<functions_root>/<function_name>/` exists.
+2. Validates the inputs and confirms `<functions_root>/<function_base_name>/` exists.
 3. Sets up Python at `python_version`.
 4. Authenticates to AWS with GitHub OIDC by assuming `arn:aws:iam::<aws_account_id>:role/<aws_oidc_role_name>`.
 5. Installs `requirements.txt` (if present) into a build directory.
 6. Copies the function source over the dependencies, removes `requirements.txt` and `__pycache__`, and zips the result.
-7. Uploads the zip to `s3://<s3_bucket_name>/<function_name>/<function_name>-<commit SHA>.zip`.
-8. Runs `aws lambda update-function-code` with the same zip and waits until the function is updated.
+7. Uploads the zip to `s3://<s3_bucket_name>/<deployed name>/<deployed name>-<commit SHA>.zip`.
+8. Runs `aws lambda update-function-code` on the deployed function with the same zip and waits until the function is updated.
+
+The deployed name is `<function_base_name>-<environment>-<aws_region>`, for example `test-lambda-devl-us-east-1`. The source folder uses only the base name: `<functions_root>/<function_base_name>/`.
 
 Each run writes the S3 URI and function name to the job summary.
 
@@ -48,14 +50,14 @@ File: [.github/workflows/build-deploy-lambda.yaml](.github/workflows/build-deplo
 
 | Name | Required | Default | Description |
 | --- | --- | --- | --- |
-| `function_name` | Yes | — | Lambda function to package. Must match a folder under `functions_root`, and must also be the deployed function's name. |
+| `function_base_name` | Yes | — | Lambda function base name. Must match a folder under `functions_root`. The deployed function is `<function_base_name>-<environment>-<aws_region>`. |
 | `s3_bucket_name` | Yes | — | S3 bucket that stores the deployment packages. |
 | `aws_region` | Yes | — | AWS region for OIDC authentication, S3, and Lambda. |
 | `aws_account_id` | Yes | — | AWS account ID that contains the OIDC role. |
 | `aws_oidc_role_name` | Yes | — | Name of the IAM role assumed through GitHub OIDC. Pass the name only, not the ARN. |
 | `python_version` | No | `3.12` | Python version used to install requirements and build the package. |
 | `functions_root` | No | `lambda` | Folder in the calling repository that holds one sub-folder per function. |
-| `environment` | No | `ci` | GitHub environment the job runs in. Controls which environment secrets and protection rules apply. |
+| `environment` | No | `ci` | GitHub environment the job runs in. Controls which environment secrets and protection rules apply. Also part of the deployed function name. |
 | `runner` | No | `ubuntu-26.04` | Runner label for the job. |
 
 ### Outputs
@@ -74,8 +76,8 @@ The workflow requests `contents: read` and `id-token: write`. A reusable workflo
 
 Before the workflow can run successfully:
 
-- **Function folder:** each function lives at `<functions_root>/<function_name>/` in the calling repository. Put dependencies in `requirements.txt` in that folder.
-- **Lambda function:** a function with the name `function_name` must already exist in the target account and region. The workflow updates its code and does not create it.
+- **Function folder:** each function lives at `<functions_root>/<function_base_name>/` in the calling repository. Put dependencies in `requirements.txt` in that folder.
+- **Lambda function:** a function named `<function_base_name>-<environment>-<aws_region>` must already exist in the target account and region. The workflow updates its code and does not create it.
 - **S3 bucket:** the bucket must exist and the OIDC role must allow `s3:PutObject` on it.
 - **OIDC trust:** the IAM role must trust GitHub's OIDC provider for the calling repository.
 - **IAM permissions:** the role needs `lambda:UpdateFunctionCode` and `lambda:GetFunction` (used by the wait step) on the function.
@@ -118,7 +120,7 @@ jobs:
     name: Build and deploy test-lambda
     uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
     with:
-      function_name: ${{ inputs.function_base_name || 'test-lambda' }}-${{ vars.AWS_ENVIRONMENT }}-${{ vars.AWS_REGION }}
+      function_base_name: ${{ inputs.function_base_name || 'test-lambda' }}
       s3_bucket_name: ${{ vars.LAMBDA_PACKAGES_S3_BUCKET_NAME }}
       aws_region: ${{ vars.AWS_REGION }}
       aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}

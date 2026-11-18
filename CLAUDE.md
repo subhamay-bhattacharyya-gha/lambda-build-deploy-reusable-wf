@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Purpose
 
-This repo publishes a reusable GitHub Actions workflow, `.github/workflows/build-deploy-lambda.yaml`. Other repositories call it with `uses:` to package a Python Lambda function from `<functions_root>/<function_name>/`, upload the zip to S3, and update the function code with `aws lambda update-function-code`.
+This repo publishes a reusable GitHub Actions workflow, `.github/workflows/build-deploy-lambda.yaml`. Other repositories call it with `uses:` to package a Python Lambda function from `<functions_root>/<function_base_name>/`, upload the zip to S3, and update the function code with `aws lambda update-function-code`.
 
 The main artifact is the workflow. Any change to its inputs, outputs, or steps is a change to a public interface, so update [README.md](README.md) in the same change.
 
@@ -21,8 +21,8 @@ The main artifact is the workflow. Any change to its inputs, outputs, or steps i
 - `workflow_call` inputs only support `string`, `boolean`, and `number`. There is no `choice` type. Use `string` and validate in a step.
 - A reusable workflow can only use permissions the caller grants. Keep `id-token: write` and `contents: read` declared, and say in the README that callers must grant them.
 - Keep the job's `environment:` input-driven, with `ci` as the default.
-- The Lambda function name is the `function_name` input. The folder name and the deployed function name must match. Do not add a separate name input without asking.
-- Keep the S3 key format `<function_name>/<function_name>-<GITHUB_SHA>.zip` unless the user asks to change it.
+- `function_base_name` is the base name. The source folder is `<functions_root>/<function_base_name>/`. The deployed Lambda name is `<function_base_name>-<environment>-<aws_region>`, built inside the workflow. Keep the folder check on the base name only.
+- Keep the S3 key format `<deployed name>/<deployed name>-<GITHUB_SHA>.zip`, where the deployed name is `<function_base_name>-<environment>-<aws_region>`, unless the user asks to change it.
 - The deploy step uses the zip built in that run, not the S3 object. Keep the two in sync if either changes.
 - Pin third-party actions to versions already used in this repo (`actions/checkout@v7.0.1`, `actions/setup-python@v5`, `aws-actions/configure-aws-credentials@v4`). Runner: `ubuntu-26.04`.
 

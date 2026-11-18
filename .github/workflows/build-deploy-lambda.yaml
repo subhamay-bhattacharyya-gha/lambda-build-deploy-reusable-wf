@@ -1,14 +1,14 @@
 name: Build and Upload Lambda Package
 
-run-name: Lambda package build for ${{ inputs.function_name }} by ${{ github.actor }}
+run-name: Lambda package build for ${{ inputs.function_base_name }} by ${{ github.actor }}
 
-# Reusable workflow: builds a Lambda deployment package from lambda/<function_name>/
+# Reusable workflow: builds a Lambda deployment package from lambda/<function_base_name>/
 # and uploads it to S3. All environment-specific values are passed in by the caller.
 on:
   workflow_call:
     inputs:
-      function_name:
-        description: Lambda function to package (must match a folder under functions_root)
+      function_base_name:
+        description: Lambda function base name. Must match a folder under functions_root. The deployed function is <function_base_name>-<environment>-<aws_region>.
         type: string
         required: true
       s3_bucket_name:
@@ -38,7 +38,7 @@ on:
         required: false
         default: lambda
       environment:
-        description: GitHub environment to run the job in (controls which secrets and protection rules apply)
+        description: GitHub environment to run the job in (controls which secrets and protection rules apply). Also part of the deployed function name.
         type: string
         required: false
         default: ci
@@ -66,8 +66,9 @@ jobs:
     outputs:
       s3_uri: ${{ steps.upload.outputs.s3_uri }}
     env:
-      FUNCTION_NAME: ${{ inputs.function_name }}
-      FUNCTION_DIR: ${{ inputs.functions_root }}/${{ inputs.function_name }}
+      FUNCTION_BASE_NAME: ${{ inputs.function_base_name }}
+      FUNCTION_NAME: ${{ inputs.function_base_name }}-${{ inputs.environment }}-${{ inputs.aws_region }}
+      FUNCTION_DIR: ${{ inputs.functions_root }}/${{ inputs.function_base_name }}
       LAMBDA_PACKAGE_S3_BUCKET_NAME: ${{ inputs.s3_bucket_name }}
       LAMBDA_PYTHON_VERSION: ${{ inputs.python_version }}
     steps:
@@ -77,8 +78,8 @@ jobs:
       - name: Validate inputs
         run: |
           set -euo pipefail
-          if [ -z "${FUNCTION_NAME}" ]; then
-            echo "::error::function_name input is empty"
+          if [ -z "${FUNCTION_BASE_NAME}" ]; then
+            echo "::error::function_base_name input is empty"
             exit 1
           fi
           if [ -z "${LAMBDA_PACKAGE_S3_BUCKET_NAME}" ]; then
