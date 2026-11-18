@@ -84,7 +84,16 @@ Before the workflow can run successfully:
 
 ## Example usage
 
-This caller uses dummy values and runs only from `workflow_dispatch`. Replace the bucket, account, and role values before running it.
+This caller reads its configuration from repository and organization variables and runs only from `workflow_dispatch`. Set these variables before running it:
+
+| Variable | Scope | Used for |
+|---|---|---|
+| `AWS_ACCOUNT_ID` | Repository | `aws_account_id` |
+| `AWS_ENVIRONMENT` | Repository | `environment`. Must match a GitHub environment name in the calling repository. |
+| `AWS_REGION` | Repository | `aws_region` |
+| `LAMBDA_PACKAGES_S3_BUCKET_NAME` | Repository | `s3_bucket_name` |
+| `PYTHON_VERSION` | Organization | `python_version` |
+| `AWS_OIDC_ROLE_NAME` | Organization | `aws_oidc_role_name` |
 
 ```yaml
 name: Deploy Lambda (caller example)
@@ -110,13 +119,13 @@ jobs:
     uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
     with:
       function_name: ${{ inputs.function_name || 'test-lambda' }}
-      s3_bucket_name: dummy-lambda-packages-bucket
-      aws_region: us-east-1
-      aws_account_id: "000000000000"
-      aws_oidc_role_name: dummy-github-oidc-lambda-role
-      python_version: "3.12"
+      s3_bucket_name: ${{ vars.LAMBDA_PACKAGES_S3_BUCKET_NAME }}
+      aws_region: ${{ vars.AWS_REGION }}
+      aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      aws_oidc_role_name: ${{ vars.AWS_OIDC_ROLE_NAME }}
+      python_version: ${{ vars.PYTHON_VERSION }}
       functions_root: lambda
-      environment: ci
+      environment: ${{ vars.AWS_ENVIRONMENT }}
       runner: ubuntu-26.04
 
   summary:
