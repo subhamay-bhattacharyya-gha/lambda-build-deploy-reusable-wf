@@ -1,0 +1,237 @@
+name: Build and Upload Lambda Package
+
+run-name: Lambda package build for ${{ inputs.function_base_name }} by ${{ github.actor }}
+
+# Reusable workflow: builds a Lambda deployment package from lambda/<function_base_name>/
+# and uploads it to S3. All environment-specific values are passed in by the caller.
+on:
+  workflow_call:
+    inputs:
+      function_base_name:
+        description: Lambda function base name. Must match a folder under functions_root. The deployed function is <function_base_name>-<environment>-<aws_region>.
+        type: string
+        required: true
+      s3_bucket_name:
+        description: S3 bucket that stores the Lambda deployment packages
+        type: string
+        required: true
+      aws_region:
+        description: AWS region used for OIDC authentication and S3
+        type: string
+        required: true
+      aws_account_id:
+        description: AWS account ID that holds the OIDC role
+        type: string
+        required: true
+      aws_oidc_role_name:
+        description: Name of the IAM role assumed via GitHub OIDC (no ARN)
+        type: string
+        required: true
+      python_version:
+        description: Python version used to install requirements and build the package
+        type: string
+        required: false
+        default: "3.12"
+      functions_root:
+        description: Repository folder that contains one sub-folder per Lambda function
+        type: string
+        required: false
+        default: lambda
+      environment:
+        description: GitHub environment to run the job in (controls which secrets and protection rules apply). Also part of the deployed function name.
+        type: string
+        required: false
+        default: ci
+      runner:
+        description: Runner label for the build job
+        type: string
+        required: false
+        default: ubuntu-26.04
+    outputs:
+      s3_uri:
+        description: S3 URI of the uploaded Lambda package
+        value: ${{ jobs.package.outputs.s3_uri }}
+
+# Permissions requested here must be granted by the calling workflow.
+# id-token: write is required for OIDC authentication to AWS.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  package:
+    name: Build and Upload Lambda Package
+    runs-on: ${{ inputs.runner }}
+    environment: ${{ inputs.environment }}
+    outputs:
+      s3_uri: ${{ steps.upload.outputs.s3_uri }}
+    env:
+      FUNCTION_BASE_NAME: ${{ inputs.function_base_name }}
+      FUNCTION_NAME: ${{ inputs.function_base_name }}-${{ inputs.environment }}-${{ inputs.aws_region }}
+      FUNCTION_DIR: ${{ inputs.functions_root }}/${{ inputs.function_base_name }}
+      LAMBDA_PACKAGE_S3_BUCKET_NAME: ${{ inputs.s3_bucket_name }}
+      LAMBDA_PYTHON_VERSION: ${{ inputs.python_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Print input variables
+        env:
+          IN_FUNCTION_BASE_NAME: ${{ inputs.function_base_name }}
+          IN_ENVIRONMENT: ${{ inputs.environment }}
+          IN_AWS_REGION: ${{ inputs.aws_region }}
+          IN_AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
+          IN_AWS_OIDC_ROLE_NAME: ${{ inputs.aws_oidc_role_name }}
+          IN_S3_BUCKET_NAME: ${{ inputs.s3_bucket_name }}
+          IN_PYTHON_VERSION: ${{ inputs.python_version }}
+          IN_FUNCTIONS_ROOT: ${{ inputs.functions_root }}
+          IN_RUNNER: ${{ inputs.runner }}
+        run: |
+          print_row() {
+            printf '  %-22s : %s\n' "$1" "$2"
+          }
+          echo "::group::Workflow inputs"
+          echo "============================================================"
+          echo " Lambda Build & Deploy - Input Variables"
+          echo "============================================================"
+          echo ""
+          echo "[ Function ]"
+          print_row "Base name" "${IN_FUNCTION_BASE_NAME}"
+          print_row "Folder" "${IN_FUNCTIONS_ROOT}/${IN_FUNCTION_BASE_NAME}"
+          print_row "Deployed name" "${FUNCTION_NAME}"
+          echo ""
+          echo "[ Deployment target ]"
+          print_row "Environment" "${IN_ENVIRONMENT}"
+          print_row "AWS region" "${IN_AWS_REGION}"
+          print_row "AWS account ID" "${IN_AWS_ACCOUNT_ID}"
+          print_row "OIDC role name" "${IN_AWS_OIDC_ROLE_NAME}"
+          echo ""
+          echo "[ Artifacts ]"
+          print_row "S3 bucket" "${IN_S3_BUCKET_NAME}"
+          print_row "Package key" "${FUNCTION_NAME}/${FUNCTION_NAME}-${GITHUB_SHA}.zip"
+          echo ""
+          echo "[ Build ]"
+          print_row "Python version" "${IN_PYTHON_VERSION}"
+          print_row "Runner" "${IN_RUNNER}"
+          print_row "Commit SHA" "${GITHUB_SHA}"
+          echo "============================================================"
+          echo "::endgroup::"
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          if [ -z "${FUNCTION_BASE_NAME}" ]; then
+            echo "::error::function_base_name input is empty"
+            exit 1
+          fi
+          if [ -z "${LAMBDA_PACKAGE_S3_BUCKET_NAME}" ]; then
+            echo "::error::s3_bucket_name input is empty"
+            exit 1
+          fi
+          if [ -z "${LAMBDA_PYTHON_VERSION}" ]; then
+            echo "::error::python_version input is empty"
+            exit 1
+          fi
+          if [ ! -d "${FUNCTION_DIR}" ]; then
+            echo "::error::Function folder ${FUNCTION_DIR} does not exist"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.LAMBDA_PYTHON_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.aws_oidc_role_name }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Create virtual environment and install requirements
+        run: |
+          set -euo pipefail
+          if [ -f "${FUNCTION_DIR}/requirements.txt" ]; then
+            python -m venv "${RUNNER_TEMP}/venv"
+            source "${RUNNER_TEMP}/venv/bin/activate"
+            python -m pip install --upgrade pip
+            pip install -r "${FUNCTION_DIR}/requirements.txt" --target "${RUNNER_TEMP}/package"
+          else
+            echo "No requirements.txt found in ${FUNCTION_DIR}; skipping pip install"
+            mkdir -p "${RUNNER_TEMP}/package"
+          fi
+
+      - name: Build Lambda package
+        run: |
+          set -euo pipefail
+          cp -R "${FUNCTION_DIR}/." "${RUNNER_TEMP}/package/"
+          rm -f "${RUNNER_TEMP}/package/requirements.txt"
+          cd "${RUNNER_TEMP}/package"
+          zip -r "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" . -x "*/__pycache__/*"
+          unzip -l "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" | tail -1
+
+      - name: Upload package to S3
+        id: upload
+        run: |
+          set -euo pipefail
+          KEY="${FUNCTION_NAME}/${FUNCTION_NAME}-${GITHUB_SHA}.zip"
+          S3_URI="s3://${LAMBDA_PACKAGE_S3_BUCKET_NAME}/${KEY}"
+          aws s3 cp "${RUNNER_TEMP}/${FUNCTION_NAME}.zip" "${S3_URI}"
+          echo "s3_uri=${S3_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Lambda function code
+        id: deploy
+        run: |
+          set -euo pipefail
+          aws lambda update-function-code \
+            --function-name "${FUNCTION_NAME}" \
+            --zip-file "fileb://${RUNNER_TEMP}/${FUNCTION_NAME}.zip"
+          aws lambda wait function-updated --function-name "${FUNCTION_NAME}"
+
+      - name: Write job summary
+        if: always()
+        env:
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          S3_URI: ${{ steps.upload.outputs.s3_uri }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          DEPLOY_REGION: ${{ inputs.aws_region }}
+          DEPLOY_PYTHON: ${{ inputs.python_version }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          status_badge() {
+            case "$1" in
+              success)   echo "✅ Success" ;;
+              failure)   echo "❌ Failed" ;;
+              cancelled) echo "🚫 Cancelled" ;;
+              skipped)   echo "⏭️ Skipped" ;;
+              *)         echo "⚪ Not run" ;;
+            esac
+          }
+          {
+            echo "## 🚀 Lambda Deployment"
+            echo ""
+            echo "| Detail | Value |"
+            echo "| :--- | :--- |"
+            echo "| 🔧 **Function** | \`${FUNCTION_NAME}\` |"
+            echo "| 🌍 **Environment** | \`${DEPLOY_ENVIRONMENT}\` |"
+            echo "| 📍 **Region** | \`${DEPLOY_REGION}\` |"
+            echo "| 🐍 **Python** | \`${DEPLOY_PYTHON}\` |"
+            echo "| 🔖 **Commit** | \`${COMMIT_SHA:0:7}\` |"
+            echo ""
+            echo "### 📋 Pipeline"
+            echo ""
+            echo "| Step | Status |"
+            echo "| :--- | :--- |"
+            echo "| 📦 Package upload to S3 | $(status_badge "${UPLOAD_OUTCOME}") |"
+            echo "| ⚡ Lambda code update | $(status_badge "${DEPLOY_OUTCOME}") |"
+            echo ""
+            if [ -n "${S3_URI}" ]; then
+              echo "### 📦 Artifact"
+              echo ""
+              echo "\`\`\`text"
+              echo "${S3_URI}"
+              echo "\`\`\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
