@@ -98,13 +98,13 @@ This caller reads its configuration from repository and organization variables a
 ```yaml
 name: Deploy Lambda (caller example)
 
-run-name: Deploy Lambda ${{ inputs.function_name || 'test-lambda' }} by ${{ github.actor }}
+run-name: Deploy Lambda ${{ inputs.function_base_name || 'test-lambda' }} by ${{ github.actor }}
 
 on:
   workflow_dispatch:
     inputs:
-      function_name:
-        description: Lambda function to deploy (must match a folder under lambda/)
+      function_base_name:
+        description: Lambda function base name. The deployed name is <base>-<AWS_ENVIRONMENT>-<AWS_REGION>.
         type: string
         required: false
         default: test-lambda
@@ -118,7 +118,7 @@ jobs:
     name: Build and deploy test-lambda
     uses: subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/.github/workflows/build-deploy-lambda.yaml@main
     with:
-      function_name: ${{ inputs.function_name || 'test-lambda' }}
+      function_name: ${{ inputs.function_base_name || 'test-lambda' }}-${{ vars.AWS_ENVIRONMENT }}-${{ vars.AWS_REGION }}
       s3_bucket_name: ${{ vars.LAMBDA_PACKAGES_S3_BUCKET_NAME }}
       aws_region: ${{ vars.AWS_REGION }}
       aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
