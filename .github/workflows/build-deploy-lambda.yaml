@@ -8,7 +8,7 @@ on:
   workflow_call:
     inputs:
       function_base_name:
-        description: Lambda function base name. Must match a folder under functions_root. The deployed function is <function_base_name>-<environment>-<aws_region>.
+        description: Lambda function base name. Used to build the deployed function name <function_base_name>-<environment>-<aws_region>.
         type: string
         required: true
       s3_bucket_name:
@@ -33,10 +33,9 @@ on:
         required: false
         default: "3.12"
       functions_root:
-        description: Repository folder that contains one sub-folder per Lambda function
+        description: Source folder of the function, relative to the repository root. Holds the function code and optional requirements.txt. Pass the full path, for example lambda/test-lambda.
         type: string
-        required: false
-        default: lambda
+        required: true
       environment:
         description: GitHub environment to run the job in (controls which secrets and protection rules apply). Also part of the deployed function name.
         type: string
@@ -68,7 +67,7 @@ jobs:
     env:
       FUNCTION_BASE_NAME: ${{ inputs.function_base_name }}
       FUNCTION_NAME: ${{ inputs.function_base_name }}-${{ inputs.environment }}-${{ inputs.aws_region }}
-      FUNCTION_DIR: ${{ inputs.functions_root }}/${{ inputs.function_base_name }}
+      FUNCTION_DIR: ${{ inputs.functions_root }}
       LAMBDA_PACKAGE_S3_BUCKET_NAME: ${{ inputs.s3_bucket_name }}
       LAMBDA_PYTHON_VERSION: ${{ inputs.python_version }}
     steps:
@@ -97,7 +96,7 @@ jobs:
           echo ""
           echo "[ Function ]"
           print_row "Base name" "${IN_FUNCTION_BASE_NAME}"
-          print_row "Folder" "${IN_FUNCTIONS_ROOT}/${IN_FUNCTION_BASE_NAME}"
+          print_row "Source folder" "${IN_FUNCTIONS_ROOT}"
           print_row "Deployed name" "${FUNCTION_NAME}"
           echo ""
           echo "[ Deployment target ]"

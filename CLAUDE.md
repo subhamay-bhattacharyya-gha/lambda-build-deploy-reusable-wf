@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Purpose
 
-This repo publishes a reusable GitHub Actions workflow, `.github/workflows/build-deploy-lambda.yaml`. Other repositories call it with `uses:` to package a Python Lambda function from `<functions_root>/<function_base_name>/`, upload the zip to S3, and update the function code with `aws lambda update-function-code`.
+This repo publishes a reusable GitHub Actions workflow, `.github/workflows/build-deploy-lambda.yaml`. Other repositories call it with `uses:` to package a Python Lambda function from the `functions_root` folder, upload the zip to S3, and update the function code with `aws lambda update-function-code`.
 
 The main artifact is the workflow. Any change to its inputs, outputs, or steps is a change to a public interface, so update [README.md](README.md) in the same change.
 
@@ -21,7 +21,8 @@ The main artifact is the workflow. Any change to its inputs, outputs, or steps i
 - `workflow_call` inputs only support `string`, `boolean`, and `number`. There is no `choice` type. Use `string` and validate in a step.
 - A reusable workflow can only use permissions the caller grants. Keep `id-token: write` and `contents: read` declared, and say in the README that callers must grant them.
 - Keep the job's `environment:` input-driven, with `ci` as the default.
-- `function_base_name` is the base name. The source folder is `<functions_root>/<function_base_name>/`. The deployed Lambda name is `<function_base_name>-<environment>-<aws_region>`, built inside the workflow. Keep the folder check on the base name only.
+- `function_base_name` is the base name, used only to build the deployed Lambda name `<function_base_name>-<environment>-<aws_region>` inside the workflow.
+- `functions_root` is the full source folder (for example `lambda/test-lambda`), passed by the caller. The workflow does not append the base name to it. It is required, with no default, so a missing value cannot package a whole parent folder.
 - Keep the S3 key format `<deployed name>/<deployed name>-<GITHUB_SHA>.zip`, where the deployed name is `<function_base_name>-<environment>-<aws_region>`, unless the user asks to change it.
 - The deploy step uses the zip built in that run, not the S3 object. Keep the two in sync if either changes.
 - The deployed name is built inside the workflow from `function_base_name`, `environment`, and `aws_region`. Callers pass only the base name. Do not reintroduce a separate deployed-name input without asking.
