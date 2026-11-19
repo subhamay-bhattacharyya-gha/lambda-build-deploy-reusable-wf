@@ -1,6 +1,21 @@
-# lambda-build-deploy-reusable-wf
+# GitHub Reusable Workflow : Build and Deploy Lambda package
 
-![Built with Copilot](https://img.shields.io/badge/Built_with-Copilot-brightgreen?logo=github)&nbsp;![Release](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/actions/workflows/release.yaml/badge.svg)&nbsp;![Commit Activity](https://img.shields.io/github/commit-activity/t/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Last Commit](https://img.shields.io/github/last-commit/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Release Date](https://img.shields.io/github/release-date/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Repo Size](https://img.shields.io/github/repo-size/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![File Count](https://img.shields.io/github/directory-file-count/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Issues](https://img.shields.io/github/issues/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Top Language](https://img.shields.io/github/languages/top/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;![Custom Endpoint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/ea51658500e2653e96ecab6e4e9ea6d4/raw/lambda-build-deploy-reusable-wf.json?)
+<!-- Row 1: Status - Most Important -->
+[![Release](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/actions/workflows/release.yaml/badge.svg)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;[![GitHub Action](https://img.shields.io/badge/GitHub-Action-blue?logo=github)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;[![Issues](https://img.shields.io/github/issues/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/issues)&nbsp;[![Last Commit](https://img.shields.io/github/last-commit/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commits)
+
+<!-- Row 2: Code Quality -->
+[![Top Language](https://img.shields.io/github/languages/top/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;[![Commits](https://img.shields.io/github/commit-activity/t/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/commits)
+
+<!-- Row 3: Tech Stack -->
+[![AWS CLI](https://img.shields.io/badge/AWS-CLI-orange?logo=amazonaws&logoColor=white)](https://aws.amazon.com/cloudformation/)&nbsp;[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=anthropic&logoColor=white)](https://claude.ai/)
+
+<!-- Row 4: Repository Info -->
+[![Files](https://img.shields.io/github/directory-file-count/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;[![Repo Size](https://img.shields.io/github/repo-size/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)&nbsp;[![Release Date](https://img.shields.io/github/release-date/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf)](https://github.com/subhamay-bhattacharyya-gha/lambda-build-deploy-reusable-wf/releases)
+
+<!-- Row 5: Custom Metrics -->
+[![Custom Endpoint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/ea51658500e2653e96ecab6e4e9ea6d4/raw/lambda-build-deploy-reusable-wf.json?)](https://gist.github.com/bsubhamay/ea51658500e2653e96ecab6e4e9ea6d4)
+
+---
 
 A reusable GitHub Actions workflow that packages an AWS Lambda function from a folder in the calling repository, uploads the package to S3, and updates the function code. All environment-specific values are passed in as inputs, so the same workflow works across accounts, regions, and runtimes.
 
@@ -26,7 +41,7 @@ A reusable GitHub Actions workflow that packages an AWS Lambda function from a f
 For the function named by `function_base_name`, the workflow:
 
 1. Checks out the calling repository.
-2. Validates the inputs and confirms `<functions_root>/<function_base_name>/` exists.
+2. Validates the inputs and confirms the `functions_root` folder exists.
 3. Sets up Python at `python_version`.
 4. Authenticates to AWS with GitHub OIDC by assuming `arn:aws:iam::<aws_account_id>:role/<aws_oidc_role_name>`.
 5. Installs `requirements.txt` (if present) into a build directory.
@@ -34,7 +49,7 @@ For the function named by `function_base_name`, the workflow:
 7. Uploads the zip to `s3://<s3_bucket_name>/<deployed name>/<deployed name>-<commit SHA>.zip`.
 8. Runs `aws lambda update-function-code` on the deployed function with the same zip and waits until the function is updated.
 
-The deployed name is `<function_base_name>-<environment>-<aws_region>`, for example `test-lambda-devl-us-east-1`. The source folder uses only the base name: `<functions_root>/<function_base_name>/`.
+The deployed name is `<function_base_name>-<environment>-<aws_region>`, for example `test-lambda-devl-us-east-1`. The source folder is the `functions_root` input as passed by the caller, for example `lambda/test-lambda`.
 
 Each run writes the S3 URI and function name to the job summary.
 
@@ -50,13 +65,13 @@ File: [.github/workflows/build-deploy-lambda.yaml](.github/workflows/build-deplo
 
 | Name | Required | Default | Description |
 | --- | --- | --- | --- |
-| `function_base_name` | Yes | — | Lambda function base name. Must match a folder under `functions_root`. The deployed function is `<function_base_name>-<environment>-<aws_region>`. |
+| `function_base_name` | Yes | — | Lambda function base name. Used to build the deployed function name `<function_base_name>-<environment>-<aws_region>`. |
 | `s3_bucket_name` | Yes | — | S3 bucket that stores the deployment packages. |
 | `aws_region` | Yes | — | AWS region for OIDC authentication, S3, and Lambda. |
 | `aws_account_id` | Yes | — | AWS account ID that contains the OIDC role. |
 | `aws_oidc_role_name` | Yes | — | Name of the IAM role assumed through GitHub OIDC. Pass the name only, not the ARN. |
 | `python_version` | No | `3.12` | Python version used to install requirements and build the package. |
-| `functions_root` | No | `lambda` | Folder in the calling repository that holds one sub-folder per function. |
+| `functions_root` | Yes | — | Source folder of the function, relative to the repository root. Holds the function code and optional `requirements.txt`. Pass the full path, for example `lambda/test-lambda`. |
 | `environment` | No | `ci` | GitHub environment the job runs in. Controls which environment secrets and protection rules apply. Also part of the deployed function name. |
 | `runner` | No | `ubuntu-26.04` | Runner label for the job. |
 
@@ -76,7 +91,7 @@ The workflow requests `contents: read` and `id-token: write`. A reusable workflo
 
 Before the workflow can run successfully:
 
-- **Function folder:** each function lives at `<functions_root>/<function_base_name>/` in the calling repository. Put dependencies in `requirements.txt` in that folder.
+- **Function folder:** the folder passed as `functions_root` (for example `lambda/test-lambda`) must exist in the calling repository. Put dependencies in `requirements.txt` in that folder.
 - **Lambda function:** a function named `<function_base_name>-<environment>-<aws_region>` must already exist in the target account and region. The workflow updates its code and does not create it.
 - **S3 bucket:** the bucket must exist and the OIDC role must allow `s3:PutObject` on it.
 - **OIDC trust:** the IAM role must trust GitHub's OIDC provider for the calling repository.
@@ -163,7 +178,7 @@ jobs:
       aws_account_id: ${{ needs.config.outputs.aws_account_id }}
       aws_oidc_role_name: ${{ needs.config.outputs.aws_oidc_role_name }}
       python_version: ${{ needs.config.outputs.python_version }}
-      functions_root: lambda
+      functions_root: lambda/${{ inputs.function_base_name || 'test-lambda' }}
       environment: ${{ inputs.environment }}
       runner: ubuntu-26.04
 
